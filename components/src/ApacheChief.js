@@ -1,5 +1,5 @@
 // Eh-neeek-chock
-var ApacheChief = (function (global, $) {
+var ApacheChief = (function (global) {
 
     'use strict';
 
@@ -17,14 +17,14 @@ var ApacheChief = (function (global, $) {
     var defaults = {
         handles: ['BR'],
         handlesCss: {
-            TM: $.extend({}, handlesCss, { cursor: 'n-resize', top: 0, left: '50%' }),
-            TR: $.extend({}, handlesCss, { cursor: 'ne-resize', top: 0, right: 0 }),
-            MR: $.extend({}, handlesCss, { cursor: 'e-resize', bottom: '50%', right: 0 }),
-            BR: $.extend({}, handlesCss, { bottom: 0, right: 0 }),
-            BM: $.extend({}, handlesCss, { cursor: 's-resize', bottom: 0, left: '50%' }),
-            ML: $.extend({}, handlesCss, { cursor: 'w-resize', bottom: '50%', left: 0 }),
-            BL: $.extend({}, handlesCss, { cursor: 'sw-resize', bottom: 0, left: 0 }),
-            TL: $.extend({}, handlesCss, { cursor: 'nw-resize' }),
+            TM: mergeObjects({}, handlesCss, { cursor: 'n-resize', top: 0, left: '50%' }),
+            TR: mergeObjects({}, handlesCss, { cursor: 'ne-resize', top: 0, right: 0 }),
+            MR: mergeObjects({}, handlesCss, { cursor: 'e-resize', bottom: '50%', right: 0 }),
+            BR: mergeObjects({}, handlesCss, { bottom: 0, right: 0 }),
+            BM: mergeObjects({}, handlesCss, { cursor: 's-resize', bottom: 0, left: '50%' }),
+            ML: mergeObjects({}, handlesCss, { cursor: 'w-resize', bottom: '50%', left: 0 }),
+            BL: mergeObjects({}, handlesCss, { cursor: 'sw-resize', bottom: 0, left: 0 }),
+            TL: mergeObjects({}, handlesCss, { cursor: 'nw-resize' }),
         }
     };
 
@@ -48,9 +48,9 @@ var ApacheChief = (function (global, $) {
     // create resizable instance
     function ApacheChief(el, options) {
         this.el = el;
-        this.$el = $(el);
+        this.$el = el;
         // extend options with developer defined options
-        this.options = $.extend({}, defaults, options);
+        this.options = mergeObjects({}, defaults, options);
 
         // extend isn't deep, so ensure that handle css is merged properly
         mergeResizeHandleCss(this.options, options || {});
@@ -74,39 +74,85 @@ var ApacheChief = (function (global, $) {
         // properties should be adjusted when resizing
         for (var i = 0; i < handles.length; i++) {
             if (handlesCss[handles[i]]) {
-                this.$el
-                    .append($('<div class="apache-chief-resize" data-handle="' + handles[i] + '">')
-                    .css(handlesCss[handles[i]]));
+                var child = htmlify('<div class="apache-chief-resize" data-handle="' + handles[i] + '">');
+                mergeObjects(child.style, handlesCss[handles[i]]);
+                this.$el.appendChild(child);
             }
         }
 
-        $handles = this.$el.find('.apache-chief-resize');
+        $handles = this.$el.querySelector('.apache-chief-resize');
         // ensure that container is an offset parent for positioning handles
-        if (this.$el !== $handles.offsetParent()) {
-            this.$el.css('position', 'relative');
+        if (this.$el !== $handles.offsetParent) {
+            this.$el.style.position = 'relative';
         }
-        $handles.css('display', 'block');
+        $handles.style.display = 'block';
     };
 
     // bind event handlers
     ApacheChief.prototype.bind = function () {
         var self = this;
 
-        $('body').on('mouseup.apache-chief', function (e) {
-            $(window).off('mousemove.apache-chief');
+        var mousePos;
+
+        var listener;
+
+
+        document.body.addEventListener('mouseup', function (e) {
+            window.removeEventListener('mousemove', listener);
         });
 
-        this.$el.find('.apache-chief-resize').on('mousedown.apache-chief', function (e) {
-            var $handle = $(this);
-            var direction = $handle.attr('data-handle');
+        this.mouseDownListener = function onMouseDown(e) {
+            var $handle = e.target;
+            var direction = $handle.getAttribute('data-handle');
             // if true then the handle moves in a position that only affects width and height
             var adjustPosition = direction !== 'BM' &&
                 direction !== 'MR' && direction !== 'BR';
             // get the initial mouse position
-             var mousePos = {
+            mousePos = {
                 x: e.pageX,
                 y: e.pageY
             };
+
+            listener = onMouseMove;
+
+            function onMouseMove(e) {
+                // get the differences between the mousedown position and the
+                // position from the mousemove events
+                var diffs = getPositionDiffs(adjustPosition, e, mousePos, direction);
+                // get the draggable el current position relative to the document
+                var elPos;
+
+                // prevent text selection
+                e.preventDefault();
+
+                // adjust the width and height
+                if (!self.$el.style.width) self.$el.style.width = self.$el.offsetWidth + 'px';
+                if (!self.$el.style.height) self.$el.style.height = self.$el.offsetHeight + 'px';
+                self.$el.style.width = (parseInt(self.$el.style.width) + diffs.xDim) + 'px';
+                self.$el.style.height = (parseInt(self.$el.style.height) + diffs.yDim) + 'px';
+
+                // adjust the top and bottom
+                if (adjustPosition) {
+                    var offset = el.getBoundingClientRect();
+                    elPos = {
+                        top: offset.top + window.pageYOffset - document.documentElement.clientTop,
+                        left: offset.left + window.pageXOffset - document.documentElement.clientLeft
+                    };
+
+                    mergeObjects(self.$el.style, {
+                        top: (elPos.top + diffs.yPos) + 'px',
+                        left: (elPos.left + diffs.xPos) + 'px',
+                        position: 'absolute'
+                    });
+                }
+
+                // store the current mouse position
+                // to diff with the next mousemove positions
+                mousePos = {
+                    x: e.pageX,
+                    y: e.pageY
+                };
+            }
 
             // get coordinates for resizing
             function getPositionDiffs(adjustPosition, e, mousePos, direction) {
@@ -151,41 +197,12 @@ var ApacheChief = (function (global, $) {
                 return diffs;
             }
 
-            $(window).on('mousemove.apache-chief', function (e) {
-                // get the differences between the mousedown position and the
-                // position from the mousemove events
-                var diffs = getPositionDiffs(adjustPosition, e, mousePos, direction);
-                // get the draggable el current position relative to the document
-                var elPos;
+            window.addEventListener('mousemove', onMouseMove);
+        };
 
-                // prevent text selection
-                e.preventDefault();
-
-                // adjust the width and height
-                self.$el.css({
-                    width: self.$el.width() + diffs.xDim,
-                    height: self.$el.height() + diffs.yDim
-                });
-
-                // adjust the top and bottom
-                if (adjustPosition) {
-                    elPos = self.$el.offset();
-                    self.$el.css({
-                        top: elPos.top + diffs.yPos,
-                        left: elPos.left + diffs.xPos,
-                        position: 'absolute'
-                    });
-                }
-
-                // store the current mouse position
-                // to diff with the next mousemove positions
-                mousePos = {
-                    x: e.pageX,
-                    y: e.pageY
-                };
-            });
-        });
+        this.$el.querySelector('.apache-chief-resize').addEventListener('mousedown', this.mouseDownListener);
     };
+
 
     // clean up instance
     ApacheChief.prototype.destroy = function () {
@@ -200,4 +217,4 @@ var ApacheChief = (function (global, $) {
 
     return ApacheChief;
 
-})(window, jQuery);
+})(window);

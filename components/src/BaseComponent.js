@@ -1,4 +1,4 @@
-(function (root, $) {
+(function (root) {
 
     'use strict';
 
@@ -20,8 +20,8 @@
 
     // initialization code
     Component.prototype.init = function (options) {
-        this.options = $.extend({}, this.defaults, options);
-        this.$el = $(options.$el);
+        this.options = mergeObjects({}, this.defaults, options);
+        this.$el = options.$el;
         this.bind();
         return this;
     };
@@ -91,4 +91,4 @@
 
     window.Component = window.Component || Component;
 
-})(window, jQuery);
+})(window);

@@ -1,4 +1,4 @@
-var Duvet = (function (window, $, jenga) {
+var Duvet = (function (window, jenga) {
 
     'use strict';
 
@@ -18,17 +18,24 @@ var Duvet = (function (window, $, jenga) {
             visibility: 'hidden',
             overflow: 'hidden'
         };
-        var $inner = $('<div>test</div>').css(innerCss);
-        var $outer = $('<div></div>').css(outerCss).append($inner);
-        var innerEl = $inner[0];
-        var outerEl = $outer[0];
 
-        $(parentEl || 'body').append(outerEl);
+        var $inner = htmlify('<div>test</div>');
+        mergeObjects($inner.style, innerCss);
+
+        var $outer = htmlify('<div></div>');
+        mergeObjects($outer.style, outerCss);
+
+        $outer.appendChild($inner);
+
+        var innerEl = $inner;
+        var outerEl = $outer;
+
+        (parentEl || document.body).appendChild(outerEl);
         // get the layout width of the the inner element inlcuding the scrollbar
         var innerWidth = innerEl.offsetWidth;
-        $outer.css('overflow', 'scroll');
+        $outer.style.overflow = 'scroll';
         // get the inner width of the outer element, but do not include the scrollbar
-        var outerWidth = $outer[0].clientWidth;
+        var outerWidth = $outer.clientWidth;
         // remove the elements from the DOM
         $outer.remove();
 
@@ -46,9 +53,9 @@ var Duvet = (function (window, $, jenga) {
     // needs to be accounted for when positioning the overlay element
     function getScrollbarOffset(el) {
         var $el = $(el);
-        var $body = $('body');
-        var scrollWidth = el.scrollWidth === undefined ? $body[0].scrollWidth : el.scrollWidth;
-        var scrollHeight = el.scrollHeight === undefined ? $body[0].scrollHeight : el.scrollHeight;
+        var $body = document.body;
+        var scrollWidth = el.scrollWidth === undefined ? $body.scrollWidth : el.scrollWidth;
+        var scrollHeight = el.scrollHeight === undefined ? $body.scrollHeight : el.scrollHeight;
         var scrollbarWidth = getScrollbarWidth();
 
         return {
@@ -63,13 +70,13 @@ var Duvet = (function (window, $, jenga) {
         var rect;
         // https://api.jquery.com/position/
         // relative to the offset parent
-        var offset = el === window ? { top: 0, left: 0 } : $(el).position();
+        var offset = el === window ? { top: 0, left: 0 } : getPosition(el);
 
         // if containing element is the window object
         // then use $ methods for getting the width and height
         if (el === window) {
-            var width = $(window).width();
-            var height = $(window).height();
+            var width = window.innerWidth;
+            var height = window.innerHeight;
 
             rect = {
                 right: width,
@@ -107,7 +114,7 @@ var Duvet = (function (window, $, jenga) {
     function position(el, options) {
         var pos = {};
         var $parent = el.parentNode.tagName === 'BODY' ? $(window) : $(el.parentNode);
-        var $el = $(el);
+        var $el = el;
         // get the scrollbar offset
         var scrollbarOffset = getScrollbarOffset(el.parentNode.tagName === 'BODY' ? window : el.parentNode);
 
@@ -178,9 +185,9 @@ var Duvet = (function (window, $, jenga) {
 
     // used to get the margins for offset parents
     function getMargins(el) {
-        var $el = $(el);
-        var marginTop = parseInt($el.css('margin-top'), 10);
-        var marginLeft = parseInt($el.css('margin-left'), 10);
+        var $el = el;
+        var marginTop = $el && parseInt($el.style && $el.style.marginTop, 10);
+        var marginLeft = $el && parseInt($el.style && $el.style.marginLeft, 10);
 
         return {
             top: isNaN(marginTop) ? 0 : marginTop,
@@ -192,11 +199,11 @@ var Duvet = (function (window, $, jenga) {
     function align(el, options) {
         var alignToElDim = getDimensions(options.alignToEl);
         var css = { display: 'block', visibility: 'visible', position: 'absolute' };
-        var $el = $(el);
+        var $el = el;
         var parentAlignToElMargins = getMargins(options.alignToEl.parentNode);
 
         // hide element, but keep dimensions by setting the visibility to hidden
-        $el.css({
+        mergeObjects($el.style, {
             visibility: 'hidden',
             display: 'block',
             'z-index': -1000
@@ -214,41 +221,42 @@ var Duvet = (function (window, $, jenga) {
         // the el's position
         switch (options.align) {
             case 'TL':
-                css.top = (alignToElDim.top - elDim.height) - parentAlignToElMargins.top;
-                css.left = alignToElDim.left - parentAlignToElMargins.left;
+                css.top = ((alignToElDim.top - elDim.height) - parentAlignToElMargins.top) + 'px';
+                css.left = (alignToElDim.left - parentAlignToElMargins.left) + 'px';
                 break;
             case 'TR':
-                css.top = (alignToElDim.top - elDim.height) - parentAlignToElMargins.top;
-                css.left = (alignToElDim.right - elDim.width)  - parentAlignToElMargins.left;
+                css.top = ((alignToElDim.top - elDim.height) - parentAlignToElMargins.top) + 'px';
+                css.left = ((alignToElDim.right - elDim.width)  - parentAlignToElMargins.left) + 'px';
                 break;
             case 'BL':
-                css.top = alignToElDim.bottom  - parentAlignToElMargins.top;
-                css.left = alignToElDim.left - parentAlignToElMargins.left;
+                css.top = (alignToElDim.bottom  - parentAlignToElMargins.top) + 'px';
+                css.left = (alignToElDim.left - parentAlignToElMargins.left) + 'px';
                 break;
             case 'BR':
-                css.top = alignToElDim.bottom - parentAlignToElMargins.top;
-                css.left = (alignToElDim.right - elDim.width) - parentAlignToElMargins.left;
+                css.top = (alignToElDim.bottom - parentAlignToElMargins.top) + 'px';
+                css.left = ((alignToElDim.right - elDim.width) - parentAlignToElMargins.left) + 'px';
                 break;
             case 'BC':
-                css.top = alignToElDim.bottom - parentAlignToElMargins.top;
-                css.left = (((alignToElDim.width - elDim.width) / 2) +
-                    alignToElDim.left) - parentAlignToElMargins.left;
+                css.top = (alignToElDim.bottom - parentAlignToElMargins.top) + 'px';
+                css.left = ((((alignToElDim.width - elDim.width) / 2) +
+                    alignToElDim.left) - parentAlignToElMargins.left) + 'px';
                 break;
             case 'TC':
-                css.top = (alignToElDim.top - elDim.height) - parentAlignToElMargins.top;
-                css.left = (((alignToElDim.width - elDim.width) / 2) +
-                    alignToElDim.left) - parentAlignToElMargins.left;
+                css.top = ((alignToElDim.top - elDim.height) - parentAlignToElMargins.top) + 'px';
+                css.left = ((((alignToElDim.width - elDim.width) / 2) +
+                    alignToElDim.left) - parentAlignToElMargins.left) + 'px';
                 break;
             case 'M':
-                css.top = (((alignToElDim.height - elDim.height) / 2) +
-                    alignToElDim.top) - parentAlignToElMargins.top;
-                css.left = (((alignToElDim.width - elDim.width) / 2) +
-                    alignToElDim.left) - parentAlignToElMargins.left;
+                css.top = ((((alignToElDim.height - elDim.height) / 2) +
+                    alignToElDim.top) - parentAlignToElMargins.top) + 'px';
+                css.left = ((((alignToElDim.width - elDim.width) / 2) +
+                    alignToElDim.left) - parentAlignToElMargins.left) + 'px';
                 break;
         }
 
-        jenga.bringToFront(el, true);
-        $el.css(css);
+        jenga.bringToFront($el, true);
+        mergeObjects($el.style, css);
+
     }
 
     // default options
@@ -268,10 +276,10 @@ var Duvet = (function (window, $, jenga) {
     function Duvet(el, options) {
         // create references to overlay element
         this.el = el;
-        this.$el = $(el);
+        this.$el = el;
 
         // extend default options with developer defined options
-        this.setOptions($.extend({}, defaults, options));
+        this.setOptions(mergeObjects({}, defaults, options));
 
         // return instance reference
         return this;
@@ -287,7 +295,7 @@ var Duvet = (function (window, $, jenga) {
             // if alignToEl is bod then reassign to window since body height
             // is equal to content height
             this.options.alignToEl = this.options.alignToEl.tagName === 'BODY' ?
-                $(window)[0] : this.options.alignToEl;
+                window : this.options.alignToEl;
             align(this.el, this.options);
         } else {
             position(this.el, this.options);
@@ -296,7 +304,7 @@ var Duvet = (function (window, $, jenga) {
 
     // sets instance options
     Duvet.prototype.setOptions = function (options) {
-        this.options = options ? $.extend(this.options, options) : this.options;
+        this.options = options ? mergeObjects(this.options, options) : this.options;
     };
 
     // clears out any developer defined references to ensure
@@ -319,4 +327,4 @@ var Duvet = (function (window, $, jenga) {
 
     return Duvet;
 
-})(window, jQuery, jenga);
+})(window, jenga);

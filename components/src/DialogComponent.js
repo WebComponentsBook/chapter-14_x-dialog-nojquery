@@ -1,4 +1,4 @@
-(function (window, $, Component, jenga, Shamen, ApacheChief) {
+(function (window, Component, jenga, Shamen, ApacheChief) {
 
     'use strict';
 
@@ -10,18 +10,18 @@
     // constructor
     function Dialog (options) {
         // optionally clone dialog $el
-        options.$el = options.clone ? $(options.$el).clone() :
-            $(options.$el);
+        options.$el = options.clone ? options.$el.cloneNode(true) :
+            options.$el;
         // append to body
         if (options.appendToEl) {
-            $(options.appendToEl).append(options.$el);
+            options.appendToEl.appendChild(options.$el);
         }
 
         Component.call(this, options);
 
         // create a draggable instance
         if (options.draggable) {
-            this.shamen = new Shamen(this.$el[0], {
+            this.shamen = new Shamen(this.$el, {
                 // dialog header is the draghandle
                 dragHandle: '#title'
             });
@@ -29,13 +29,13 @@
 
         // create a resizable instance
         if (options.resizable) {
-            this.apacheChief = new ApacheChief(this.$el[0], {
+            this.apacheChief = new ApacheChief(this.$el, {
                 handles: ['BR']
             });
         }
 
         // create overlay instance
-        this.overlay = new Duvet(this.$el[0], {
+        this.overlay = new Duvet(this.$el, {
             fixed: options.draggable ? false : true,
             alignToEl: options.alignToEl
         });
@@ -47,7 +47,7 @@
         // call super method
         Component.prototype.init.call(this, options);
         // position the dialog's root element absolutely
-        this.$el.css({ position: 'absolute' });
+        this.$el.style.position = 'absolute';
     };
 
     // defaults, e.g., width and height
@@ -89,4 +89,4 @@
 
     window.Dialog = window.Dialog || Dialog;
 
-})(window, jQuery, Component, jenga, Shamen, ApacheChief);
+})(window, Component, jenga, Shamen, ApacheChief);
